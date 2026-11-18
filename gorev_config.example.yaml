@@ -1,0 +1,46 @@
+# ==============================================================================
+# Gorev Configuration File
+# Copy this file to gorev_config.yaml and adjust values for your environment.
+# ==============================================================================
+
+# HTTP Server settings for the load balancer listener
+server:
+  # The TCP port the load balancer listens on for incoming client requests
+  listen_port: 8080
+
+# Upstream pools define logical groups of backend servers that handle traffic
+upstreams:
+  # Unique identifier for this upstream pool (referenced by routes below).
+  api_backend:
+    # Load balancing algorithm for distributing traffic across backends
+    # Options: "round_robin" (default), "weighted_round_robin", "least_connections"
+    strategy: "least_connections"
+    # Optional active health check configuration for this upstream pool
+    # If omitted, passive health checks or always-healthy behavior applies
+    health_check:
+      # HTTP GET endpoint probed on each backend to verify health (expects 2xx)
+      path: "/health"
+      # Time duration between consecutive health check probes (e.g., 5s, 10s, 1m)
+      interval: 5s
+      # List of target backend nodes belonging to this upstream pool.
+    backends:
+      - url: "http://10.0.0.1:9000" # Full scheme + host/IP + port of the node
+        # Relative traffic weight for weighted strategies (defaults to 1 if omitted)
+        weight: 2
+      - url: "http://10.0.0.2:9000"
+        weight: 1
+  # Example of a minimal upstream using default settings (round_robin, weight: 1)
+  web_backend:
+    backends:
+      - url: "http://10.0.0.3:3000"
+      - url: "http://10.0.0.4:3000"
+
+# Routing rules match incoming HTTP requests by Host header and URL path prefix,
+# forwarding matching traffic to the designated upstream pool
+routes:
+  - host: "example.com" # Matches the incoming HTTP Host header
+    path_prefix: "/api" # Matches any request path starting with "/api"
+    upstream: "api_backend" # Target upstream pool as defined under 'upstreams'
+  - host: "example.com"
+    path_prefix: "/"
+    upstream: "web_backend"
