@@ -22,7 +22,7 @@ upstreams:
       path: "/health"
       # Time duration between consecutive health check probes (e.g., 5s, 10s, 1m)
       interval: 5s
-      # List of target backend nodes belonging to this upstream pool.
+    # List of target backend nodes belonging to this upstream pool.
     backends:
       - url: "http://10.0.0.1:9000" # Full scheme + host/IP + port of the node
         # Relative traffic weight for weighted strategies (defaults to 1 if omitted)
