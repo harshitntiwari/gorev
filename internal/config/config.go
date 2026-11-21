@@ -3,6 +3,7 @@ package config
 import (
 	"cmp"
 	"fmt"
+	"net/url"
 	"os"
 	"time"
 
@@ -84,11 +85,10 @@ func Load(filePath string) (*Config, error) {
 }
 
 func validateCfg(cfg *Config) error {
-	// validate routes
-	for _, route := range cfg.Routes {
-		if _, exists := cfg.Upstreams[route.Upstream]; !exists {
-			return fmt.Errorf("routes reference an upstream that does not exist in upstreams: %s", route.Upstream)
-		}
+
+	// validate server config
+	if cfg.Server.ListenPort < 1 || cfg.Server.ListenPort > 65535 {
+		return fmt.Errorf("server listen port out of range, valid range: 1 - 65535")
 	}
 
 	// validate upstreams
@@ -96,13 +96,33 @@ func validateCfg(cfg *Config) error {
 		if len(upstream.Backends) == 0 {
 			return fmt.Errorf("upstream %s has no backend configured", name)
 		}
-		for _, backend := range upstream.Backends {
+
+		for i, backend := range upstream.Backends {
+			if _, err := url.Parse(backend.URL); err != nil {
+				return fmt.Errorf("invalid backend url: %s", backend.URL)
+			}
+			if backend.Weight < 0 {
+				return fmt.Errorf("invalid weight %d, backend weight must be a positive non-zero value", backend.Weight)
+			}
 			backend.Weight = cmp.Or(backend.Weight, int(defaultBackendWeight))
+			upstream.Backends[i] = backend
 		}
 
 		upstream.Strategy = cmp.Or(upstream.Strategy, defaultLoadBalancingStrategy)
-		upstream.HealthCheck.Interval = cmp.Or(upstream.HealthCheck.Interval, 10*time.Second)
+		if upstream.HealthCheck.Path != "" {
+			upstream.HealthCheck.Interval = cmp.Or(upstream.HealthCheck.Interval, 10*time.Second)
+		}
 		cfg.Upstreams[name] = upstream
+	}
+
+	// validate routes
+	for _, route := range cfg.Routes {
+		if route.PathPrefix == "" {
+			return fmt.Errorf("route path_prefix cannot be empty")
+		}
+		if _, exists := cfg.Upstreams[route.Upstream]; !exists {
+			return fmt.Errorf("routes reference an upstream that does not exist in upstreams: %s", route.Upstream)
+		}
 	}
 	return nil
 }
